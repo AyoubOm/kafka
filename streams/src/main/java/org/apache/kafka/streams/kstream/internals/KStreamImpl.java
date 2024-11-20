@@ -20,28 +20,7 @@ import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.internals.ApiUtils;
-import org.apache.kafka.streams.kstream.BranchedKStream;
-import org.apache.kafka.streams.kstream.ForeachAction;
-import org.apache.kafka.streams.kstream.GlobalKTable;
-import org.apache.kafka.streams.kstream.Grouped;
-import org.apache.kafka.streams.kstream.JoinWindows;
-import org.apache.kafka.streams.kstream.Joined;
-import org.apache.kafka.streams.kstream.KGroupedStream;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
-import org.apache.kafka.streams.kstream.KeyValueMapper;
-import org.apache.kafka.streams.kstream.Materialized;
-import org.apache.kafka.streams.kstream.Named;
-import org.apache.kafka.streams.kstream.Predicate;
-import org.apache.kafka.streams.kstream.Printed;
-import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.kstream.Repartitioned;
-import org.apache.kafka.streams.kstream.StreamJoined;
-import org.apache.kafka.streams.kstream.ValueJoiner;
-import org.apache.kafka.streams.kstream.ValueJoinerWithKey;
-import org.apache.kafka.streams.kstream.ValueMapper;
-import org.apache.kafka.streams.kstream.ValueMapperWithKey;
-import org.apache.kafka.streams.kstream.ValueTransformerWithKeySupplier;
+import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.kstream.internals.graph.BaseRepartitionNode;
 import org.apache.kafka.streams.kstream.internals.graph.BaseRepartitionNode.BaseRepartitionNodeBuilder;
 import org.apache.kafka.streams.kstream.internals.graph.GraphNode;
@@ -66,6 +45,7 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.VersionedBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.RocksDBTimeOrderedKeyValueBuffer;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -1465,5 +1445,36 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
             repartitionRequired,
             processNode,
             builder);
+    }
+
+    @Override
+    public KStream<K, V> deduplicateByKey(final Duration deduplicationInterval) {
+        // TODO
+        // Should we use StatefulProcessorNode or define a new ProcessorGraphNode child ?
+        return deduplicateByKeyValue((key, value) -> key, deduplicationInterval); // TODO: to check
+    }
+
+
+    @Override
+    public KStream<K, V> deduplicateByKey(final Duration deduplicationInterval,
+                                          final Deduplicated<K, V> deduplicated) {
+        return deduplicateByKeyValue((key, value) -> key, deduplicationInterval, deduplicated); // TODO: to check
+        // TODO
+    }
+
+    @Override
+    public <KR> KStream<K, V> deduplicateByKeyValue(final KeyValueMapper<? super K, ? super V, ? extends KR> idSelector,
+                                                    final Duration deduplicationInterval) {
+        // TODO
+    }
+
+    @Override
+    public <KR> KStream<K, V> deduplicateByKeyValue(final KeyValueMapper<? super K, ? super V, ? extends KR> idSelector,
+                                                    final Duration deduplicationInterval,
+                                                    final Deduplicated<KR, V> deduplicated) {
+        Objects.requireNonNull(idSelector, "idSelector can't be null");
+        Objects.requireNonNull(deduplicationInterval, "deduplicationInterval can't be null");
+        Objects.requireNonNull(deduplicated, "deduplicated can't be null");
+        // TODO
     }
 }

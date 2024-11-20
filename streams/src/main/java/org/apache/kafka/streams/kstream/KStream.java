@@ -35,6 +35,8 @@ import org.apache.kafka.streams.processor.api.ProcessorSupplier;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 
+import java.time.Duration;
+
 /**
  * {@code KStream} is an abstraction of a <i>record stream</i> of {@link KeyValue} pairs, i.e., each record is an
  * independent entity/event in the real world.
@@ -4519,4 +4521,112 @@ public interface KStream<K, V> {
         final Named named,
         final String... stateStoreNames
     );
+
+// TODO: Check the generated javadocs, and adapt formatting of examples (maybe don't use @code)
+    /**
+     * Filter out duplicates from this stream based on record's key, within the provided time interval.
+     * After receiving a non-duplicate record, any record with the same key that is received within the provided deduplicationInterval
+     * (interval bounds are inclusive) will be discarded. This applies to both in-order and out-of-order duplicates (see example below).
+     * After deduplicationInterval has elapsed since a non-duplicate record is received, a new record having
+     * the same key is considered a non-duplicate, and is forwarded to the resulting {@link KStream}.
+     * <p>
+     * A late record that is late by strictly more than deduplicationInterval from the current stream time
+     * is systematically forwarded, unless it had a forwarded duplicate (within its deduplicationInterval)
+     * whose timestamp is in the window [currentStreamTime-deduplicationInterval, currentStreamTime] (see example below).
+     * Records with a {@code null} key are always forwarded to the resulting {@link KStream}, no deduplication is performed on them.
+     * <p>
+     * In the following example, events r1 to r6 have the same key.
+     * <pre>{@code
+     * r1 at t -> forwarded
+     * r2 at t+deduplicationInterval -> discarded
+     * r3 at t-deduplicationInterval -> discarded
+     * r4 at t+deduplicationInterval+1 -> forwarded
+     * r5 at t -> forwarded (late record)
+     * r6 at t -> forwarded (late record)
+     * }</pre>
+     * In the following example, we consider events having different keys k1 and k2.
+     * <pre>{@code
+     * k1 at t -> forwarded
+     * k2 at t+deduplicationInterval -> forwarded (currentStreamTime = t+deduplicationInterval)
+     * k1 at t-deduplicationInterval -> discarded (although this is a late event, it has a duplicate which is in the window [currentStreamTime-deduplicationInterval, currentStreamTime]
+     * }</pre>
+     * <p>
+     * If a key changing operator was used before this operation (e.g., {@link #selectKey(KeyValueMapper)},
+     * {@link #map(KeyValueMapper)}, {@link #flatMap(KeyValueMapper)} or
+     * {@link #process(ProcessorSupplier, String...)}) an internal repartitioning topic will be created in Kafka.
+     * This topic will be named "${applicationId}-<name>-repartition", where "applicationId" is user-specified in
+     * {@link StreamsConfig} via parameter {@link StreamsConfig#APPLICATION_ID_CONFIG APPLICATION_ID_CONFIG},
+     * <name> is an internally generated name, and "-repartition" is a fixed suffix.
+     *
+     * @param deduplicationInterval             the duration within which subsequent duplicates of a record will be discarded
+     * @return                                  a KStream that contains the same records of this KStream without duplicates
+     */
+    KStream<K, V> deduplicateByKey(final Duration deduplicationInterval);
+
+
+    KStream<K, V> deduplicateByKey(final Duration deduplicationInterval,
+                                   final Deduplicated<K, V> deduplicated);
+
+
+    /**
+     * Filter out duplicates from this stream based on record's key and the provided {@link KeyValueMapper}, within the provided time interval.
+     * The provided {@link KeyValueMapper} maps a record to an id.
+     * For two records to be duplicate, they must have the same key and the same id.
+     * <p>
+     * Example of usage.
+     * <pre>{@code
+     * KStream<String, Object> inputStream = builder.stream("topic");
+     *
+     * KStream<String, Object> outputStream = inputStream.deduplicateByKeyValue(new KeyValueMapper<String, Object, String>() {
+     *     String apply(String key, Object value) {
+     *         return value.id;
+     *     }
+     * }, Duration.ofSeconds(60));
+     * }</pre>
+     * </p>
+     * After receiving a non-duplicate record, any duplicates received within the provided deduplicationInterval
+     * (interval bounds are inclusive) will be discarded. This applies to both in-order and out-of-order duplicates (see examples below).
+     * After deduplicationInterval has elapsed since a non-duplicate record is received, a new record having
+     * the same (key, id) is considered a non-duplicate, and is forwarded to the resulting {@link KStream}.
+     * <p>
+     * A late record that is late by strictly more than deduplicationInterval from the current stream time
+     * is systematically forwarded, unless it had a forwarded duplicate (within its deduplicationInterval)
+     * whose timestamp is in the window [currentStreamTime-deduplicationInterval, currentStreamTime] (see example below).
+     * Records with a {@code null} key OR a {@code null} id are always forwarded to the resulting {@link KStream}, no deduplication is performed on them.
+     * <p>
+     * In the following example, events r1 to r6 have the same key and id.
+     * <pre>{@code
+     * r1 at t -> forwarded
+     * r2 at t+deduplicationInterval -> discarded
+     * r3 at t-deduplicationInterval -> discarded
+     * r4 at t+deduplicationInterval+1 -> forwarded
+     * r5 at t -> forwarded (late record)
+     * r6 at t -> forwarded (late record)
+     * }</pre>
+     * In the following example, we consider events having different id k1 and k2.
+     * <pre>{@code
+     * k1 at t -> forwarded
+     * k2 at t+deduplicationInterval -> forwarded (and currentStreamTime = t+deduplicationInterval)
+     * k1 at t-deduplicationInterval -> discarded (although this is a late event, it has a duplicate which is in the window [currentStreamTime-deduplicationInterval, currentStreamTime]
+     * }</pre>
+     * <p>
+     * If a key changing operator was used before this operation (e.g., {@link #selectKey(KeyValueMapper)},
+     * {@link #map(KeyValueMapper)}, {@link #flatMap(KeyValueMapper)} or
+     * {@link #process(ProcessorSupplier, String...)}) an internal repartitioning topic will be created in Kafka.
+     * This topic will be named "${applicationId}-<name>-repartition", where "applicationId" is user-specified in
+     * {@link StreamsConfig} via parameter {@link StreamsConfig#APPLICATION_ID_CONFIG APPLICATION_ID_CONFIG},
+     * <name> is an internally generated name, and "-repartition" is a fixed suffix.
+     *
+     * @param idSelector                        a {@link KeyValueMapper} that returns the unique id of the record
+     * @param deduplicationInterval             the duration within which subsequent duplicates of a record will be discarded
+     * @param <KR>                              the type of the deduplication id
+     * @return                                  a KStream that contains the same records of this KStream without duplicates
+     */
+    <KR> KStream<K, V> deduplicateByKeyValue(final KeyValueMapper<? super K, ? super V, ? extends KR> idSelector,
+                                             final Duration deduplicationInterval);
+
+
+    <KR> KStream<K, V> deduplicateByKeyValue(final KeyValueMapper<? super K, ? super V, ? extends KR> idSelector,
+                                             final Duration deduplicationInterval,
+                                             final Deduplicated<KR, V> deduplicated);
 }
