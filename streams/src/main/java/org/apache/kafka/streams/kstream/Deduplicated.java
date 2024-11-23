@@ -3,9 +3,12 @@ package org.apache.kafka.streams.kstream;
 import org.apache.kafka.common.serialization.Serde;
 
 // TODO: add java docs
+// TODO: What types are needed K ? KId ? V ?
+// TODO: Is V serde necessary if we don't intend to store the value in the store ? Is it necessary for repartitioning ?
 public class Deduplicated<K, V> implements NamedOperation<Deduplicated<K, V>> {
 
-    protected final String name;
+    protected final String name; // TODO: A priori, this provides the name of the repartition topic. QST: Where do we specify the name of deduplication node ?
+    // TODO: and to what value should we set it ?
     protected final String storeName;
     protected final Serde<K> keySerde;
     protected final Serde<V> valueSerde;

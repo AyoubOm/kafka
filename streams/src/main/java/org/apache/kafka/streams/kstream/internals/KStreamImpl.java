@@ -111,6 +111,8 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
 
     private static final String REPARTITION_NAME = "KSTREAM-REPARTITION-";
 
+    private static final String DEDUPLICATE_NAME = "KSTREAM-DEDUPLICATE-";
+
     private final boolean repartitionRequired;
 
     private OptimizableRepartitionNode<K, V> repartitionNode;
@@ -1451,20 +1453,21 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
     public KStream<K, V> deduplicateByKey(final Duration deduplicationInterval) {
         // TODO
         // Should we use StatefulProcessorNode or define a new ProcessorGraphNode child ?
-        return deduplicateByKeyValue((key, value) -> key, deduplicationInterval); // TODO: to check
+        return deduplicateByKeyValue((key, __) -> key, deduplicationInterval); // TODO: to check
     }
 
 
     @Override
     public KStream<K, V> deduplicateByKey(final Duration deduplicationInterval,
                                           final Deduplicated<K, V> deduplicated) {
-        return deduplicateByKeyValue((key, value) -> key, deduplicationInterval, deduplicated); // TODO: to check
+        return deduplicateByKeyValue((key, __) -> key, deduplicationInterval, deduplicated); // TODO: to check
         // TODO
     }
 
     @Override
     public <KR> KStream<K, V> deduplicateByKeyValue(final KeyValueMapper<? super K, ? super V, ? extends KR> idSelector,
                                                     final Duration deduplicationInterval) {
+        return deduplicateByKeyValue(idSelector, deduplicationInterval, Deduplicated.with(null, valueSerde));
         // TODO
     }
 
@@ -1476,5 +1479,50 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         Objects.requireNonNull(deduplicationInterval, "deduplicationInterval can't be null");
         Objects.requireNonNull(deduplicated, "deduplicated can't be null");
         // TODO
+
+        final Set<String> subTopologySourceNodes;
+        final GraphNode parentNode;
+
+        if (repartitionRequired) {
+            final OptimizableRepartitionNodeBuilder<K, V> repartitionNodeBuilder = optimizableRepartitionNodeBuilder();
+            final String sourceName = createRepartitionedSource(
+                    builder,
+                    ???,
+                    ???,
+                    name,
+                    null,
+                    repartitionNodeBuilder
+            );
+
+            parentNode = repartitionNodeBuilder.build();
+            builder.addGraphNode(graphNode, parentNode);
+            subTopologySourceNodes = Collections.singleton(sourceName);
+        } else {
+            parentNode = graphNode;
+            subTopologySourceNodes = this.subTopologySourceNodes;
+        }
+
+        final DeduplicatedInternal<KR, V> deduplicatedInternal = new DeduplicatedInternal<>(deduplicated);
+        final String name = new NamedInternal(deduplicatedInternal.name()).orElseGenerateWithPrefix(builder, DEDUPLICATE_NAME);
+
+        ProcessorParameters<K, V, K, V> processorParameters = new ProcessorParameters<>(new KStreamDeduplicate<K, KR, V>(idSelector, deduplicationInterval), name);
+        final StatefulProcessorNode<? super K, ? super V> deduplicationProcessorNode = new StatefulProcessorNode<K, V>(
+                name,
+                processorParameters,
+                ???
+        );
+
+        builder.addGraphNode(parentNode, deduplicationProcessorNode);
+
+        return new KStreamImpl<>(
+                name, // TODO: Is it this or the name in the field graphNode that appears in the topology ? -> I think the one in graphNode, then WHY this field
+                keySerde,
+                valueSerde,
+                subTopologySourceNodes,
+                false,
+                deduplicationProcessorNode,
+                builder);
+
+        // next-time: How State stores are defined and referenced in different processors: the one getting a custom .. (see paper)
     }
 }
