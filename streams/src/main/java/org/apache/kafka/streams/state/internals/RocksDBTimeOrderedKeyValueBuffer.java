@@ -175,7 +175,7 @@ public class RocksDBTimeOrderedKeyValueBuffer<K, V> implements TimeOrderedKeyVal
         partition = context.taskId().partition();
         if (loggingEnabled) {
             changelogTopic = ProcessorContextUtils.changelogFor(context, name(), Boolean.TRUE);
-        }
+        } // TODO: Why this ?
     }
 
     @Override

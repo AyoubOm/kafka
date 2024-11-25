@@ -9,7 +9,7 @@ public class Deduplicated<K, V> implements NamedOperation<Deduplicated<K, V>> {
 
     protected final String name; // TODO: A priori, this provides the name of the repartition topic. QST: Where do we specify the name of deduplication node ?
     // TODO: and to what value should we set it ?
-    protected final String storeName;
+    protected final String storeName; // TODO: To remove ? What is the benefit to let the user choose a name if he is not intended to access the store (it stores technical metadata + it's more than one store)
     protected final Serde<K> keySerde;
     protected final Serde<V> valueSerde;
 

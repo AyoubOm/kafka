@@ -98,7 +98,10 @@ public class StreamJoinedStoreFactory<K, V1, V2> extends AbstractConfigurableSto
                 supplier,
                 joinedInternal.keySerde(),
                 valueSerde
-        );
+        ); // TODO: the reason why we are not doing a simple new WindowStore is to spare ourselves the details (caching, logging)
+    //              for the TTL Store because it is wrapper, we will have a new, and its components will be built in the same way as here
+        //          However, we should make sure the stores are persistent ! If we do the same as here, and the user sets the configuration of dsl suppliers to in-memory we are in trouble
+        //          maybe in this case we can build the store directly from the topology
 
         if (joinedInternal.loggingEnabled()) {
             builder.withLoggingEnabled(logConfig);

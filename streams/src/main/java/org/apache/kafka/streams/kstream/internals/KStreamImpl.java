@@ -42,6 +42,7 @@ import org.apache.kafka.streams.processor.internals.InternalTopicProperties;
 import org.apache.kafka.streams.processor.internals.StaticTopicNameExtractor;
 import org.apache.kafka.streams.processor.internals.StoreBuilderWrapper;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.TtlStore;
 import org.apache.kafka.streams.state.VersionedBytesStoreSupplier;
 import org.apache.kafka.streams.state.internals.RocksDBTimeOrderedKeyValueBuffer;
 
@@ -1456,7 +1457,6 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         return deduplicateByKeyValue((key, __) -> key, deduplicationInterval); // TODO: to check
     }
 
-
     @Override
     public KStream<K, V> deduplicateByKey(final Duration deduplicationInterval,
                                           final Deduplicated<K, V> deduplicated) {
@@ -1505,14 +1505,19 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
         final DeduplicatedInternal<KR, V> deduplicatedInternal = new DeduplicatedInternal<>(deduplicated);
         final String name = new NamedInternal(deduplicatedInternal.name()).orElseGenerateWithPrefix(builder, DEDUPLICATE_NAME);
 
+        final String storeName = "???";
+
         ProcessorParameters<K, V, K, V> processorParameters = new ProcessorParameters<>(new KStreamDeduplicate<K, KR, V>(idSelector, deduplicationInterval), name);
-        final StatefulProcessorNode<? super K, ? super V> deduplicationProcessorNode = new StatefulProcessorNode<K, V>(
+        final StatefulProcessorNode<? super K, ? super V> deduplicationProcessorNode = new StatefulProcessorNode<>(
                 name,
                 processorParameters,
-                ???
+                new String[]{storeName}
         );
 
         builder.addGraphNode(parentNode, deduplicationProcessorNode);
+
+        final TtlStore.Builder<K, V> storeBuilder = new TtlStore.Builder<>(storeName);
+        builder.addStateStore(new StoreBuilderWrapper(storeBuilder));
 
         return new KStreamImpl<>(
                 name, // TODO: Is it this or the name in the field graphNode that appears in the topology ? -> I think the one in graphNode, then WHY this field
@@ -1523,6 +1528,11 @@ public class KStreamImpl<K, V> extends AbstractStream<K, V> implements KStream<K
                 deduplicationProcessorNode,
                 builder);
 
-        // next-time: How State stores are defined and referenced in different processors: the one getting a custom .. (see paper)
+        // still-open-qst: How do we register the TTL store in the topology ? With suppliers ? Will we have one wrapper supplier ? Or suppliers of its components ?
+            // For if we use suppliers, no. For the moment I assume we can define only the wrapper.
+
+        // problem ?: study if logging and caching can function properly with a wrapper store. Is the RocksDBBuffer cachable & loggable ?
+        //  TODO: if it is not cachable, then it's probably a performance issue ? We should notify the community if so (after study)
+
     }
 }

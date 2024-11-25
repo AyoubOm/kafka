@@ -83,6 +83,8 @@ class GroupedStreamAggregateBuilder<K, V> {
         if (repartitionRequired) {
             final OptimizableRepartitionNodeBuilder<K, V> repartitionNodeBuilder = optimizableRepartitionNodeBuilder();
             final String repartitionTopicPrefix = userProvidedRepartitionTopicName != null ? userProvidedRepartitionTopicName : storeFactory.name();
+            // TODO: groupedInternal is always provided right ? So userProvidedRepartitionTopicName is always not null right ?
+            //  -> If the user has not specified a Grouped, then name is set to null. Deduplicated.name provides (among others ?) the name of the repartition topic
             sourceName = createRepartitionSource(repartitionTopicPrefix, repartitionNodeBuilder);
 
             // First time through we need to create a repartition node.
@@ -90,7 +92,9 @@ class GroupedStreamAggregateBuilder<K, V> {
             // the user has provided a name for the repartition topic, is so we re-use
             // the existing repartition node, otherwise we create a new one.
             if (repartitionNode == null || userProvidedRepartitionTopicName == null) {
-                repartitionNode = repartitionNodeBuilder.build();
+                repartitionNode = repartitionNodeBuilder.build(); // TODO: What is the benefit of this ? this build KTable method is called only once no ?
+                // TODO: Is it when we have more than one action on a GroupedStream (ex: a count() and a reduce()). If this is the only reason why we introduced this (I don't believe so)
+                // then we don't need this stuff for deduplication node
             }
 
             builder.addGraphNode(parentNode, repartitionNode);
